@@ -26,12 +26,18 @@ injection, so it's safe to chain with `&&` in scripts.
 
 ## Demo
 
-<img src="assets/demo.gif" width="300" alt="Two-finger pinch and pan injected over adb, zooming and dragging a 3D model on an Android emulator">
+Google Maps, pinched from the command line — nothing about the app is modified or instrumented:
 
-Every frame above is driven by `./mt` — no touchscreen, no root, no `am instrument`. Built while
-testing [Strux — IFC & BIM Viewer](https://play.google.com/store/apps/details?id=com.nowjordanhappy.strux),
-where pinch-to-zoom and two-finger pan are the whole interaction model and there was no way to
-exercise them from `adb`.
+<img src="assets/maps.gif" width="300" alt="Google Maps zooming in and out of New York, driven by two-finger pinch gestures injected over adb">
+
+It works the same in any app. Below is [Strux — IFC & BIM
+Viewer](https://play.google.com/store/apps/details?id=com.nowjordanhappy.strux), which is what this
+tool was built for: pinch-to-zoom and two-finger pan are its whole interaction model, and there was
+no way to exercise them from `adb`.
+
+<img src="assets/demo.gif" width="300" alt="A 3D building model zooming and panning, driven by two-finger gestures injected over adb">
+
+Every frame in both is driven by `./mt` — no touchscreen, no root, no `am instrument`.
 
 ## Why this works without root
 
@@ -46,6 +52,10 @@ those for shell), no root, no `am instrument`.
 - **MIUI / some OEMs:** enable *Developer options → USB debugging (Security settings)* (it lets adb
   simulate input). It silently resets itself; if injection does nothing, re-check it.
 - Injects into whatever window is focused (the coordinates are absolute screen pixels).
+- **Let the app settle between gestures.** Fire a second gesture while the app is still animating the
+  first (Maps' zoom easing, a fling, a camera move it started itself) and it may swallow it, or read
+  a pinch as a drag. Injection still succeeds and exits 0 — the app just ignored it. ~2s apart is
+  reliable; 1s was not.
 - Verified on Android 11 and Android 16 (API 36) emulators, **shell + SELinux Enforcing + no root**.
   Android 14 moved injection onto `InputManagerGlobal`; the tool tries that first, falls back to
   `InputManager` on older releases.
