@@ -7,6 +7,29 @@ multi-pointer `MotionEvent`s through the framework (`InputManager.injectInputEve
 privileged path `input` itself uses — so it works as the **shell** user with **SELinux enforcing**:
 non-rootable emulators and physical devices alike.
 
+## Getting started
+
+You need `adb` on your `PATH` and a device with USB debugging on. **No build step** — the `mt.jar`
+in this repo is prebuilt, and there's nothing to install on your machine beyond the repo itself.
+
+```bash
+git clone https://github.com/nowjordanhappy/adb-multitouch.git
+cd adb-multitouch
+
+adb devices                    # your device should be listed as "device", not "unauthorized"
+./mt install                   # pushes mt.jar to /data/local/tmp (once per device)
+
+./mt pinch 540 1170 300 1300   # pinch out on whatever is on screen right now
+```
+
+If the last line zooms something, you're done. Nothing is installed as an app, nothing persists
+beyond a 3KB jar in `/data/local/tmp` — delete it with
+`adb shell rm /data/local/tmp/mt.jar` when you're finished.
+
+`./mt install` is optional: any command auto-pushes the jar if it's missing.
+
+## Usage
+
 ```bash
 ./mt install                          # push mt.jar to the device (once)
 ./mt pinch 540 1170 300 1300          # pinch OUT (zoom in): finger gap 300px -> 1300px around (540,1170)
@@ -39,8 +62,7 @@ For `pinch` the two fingers are placed **vertically**, `gap/2` above and below `
 the gesture runs off the edge and the app sees something odd. For `pan` they sit 240px apart
 horizontally and move together.
 
-Needs `adb` on your `PATH` and USB debugging on. Exits non-zero if the framework rejects the
-injection, so it's safe to chain with `&&` in scripts.
+Exits non-zero if the framework rejects the injection, so it's safe to chain with `&&` in scripts.
 
 ## Demo
 
