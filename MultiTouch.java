@@ -1,4 +1,4 @@
-package com.strux.mt;
+package com.nowjordanhappy.mt;
 
 import android.os.SystemClock;
 import android.view.InputDevice;
@@ -13,7 +13,7 @@ import java.lang.reflect.Method;
  * program run as the shell user calling InputManager.injectInputEvent), but exposing TWO-finger events
  * that the stock `input` CLI doesn't. Coordinates are screen pixels, like `input tap`.
  *
- *   adb shell CLASSPATH=/data/local/tmp/mt.jar app_process /system/bin com.strux.mt.MultiTouch \
+ *   adb shell CLASSPATH=/data/local/tmp/mt.jar app_process /system/bin com.nowjordanhappy.mt.MultiTouch \
  *       pinch  <cx> <cy> <startGap> <endGap> [steps] [ms]
  *       pan    <cx> <cy> <dx> <dy>           [steps] [ms]
  *       tap    <x> <y>

@@ -4,4 +4,4 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 javac -d "$tmp" "$HERE/Gestures.java" "$HERE/GesturesTest.java"
-java -ea -cp "$tmp" com.strux.mt.GesturesTest
+java -ea -cp "$tmp" com.nowjordanhappy.mt.GesturesTest

@@ -1,6 +1,6 @@
-package com.strux.mt;
+package com.nowjordanhappy.mt;
 
-/** Runnable self-check for the gesture geometry. `javac Gestures.java GesturesTest.java && java -ea com.strux.mt.GesturesTest`. */
+/** Runnable self-check for the gesture geometry. `javac Gestures.java GesturesTest.java && java -ea com.nowjordanhappy.mt.GesturesTest`. */
 public class GesturesTest {
     public static void main(String[] a) {
         // --- pinch ---

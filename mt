@@ -10,7 +10,7 @@
 set -euo pipefail
 
 REMOTE=/data/local/tmp/mt.jar
-CLASS=com.strux.mt.MultiTouch
+CLASS=com.nowjordanhappy.mt.MultiTouch
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 ADB=(adb)

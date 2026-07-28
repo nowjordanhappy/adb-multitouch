@@ -1,4 +1,4 @@
-package com.strux.mt;
+package com.nowjordanhappy.mt;
 
 /**
  * Pure two-pointer gesture geometry — no android deps, so it unit-tests on a plain JVM (the injection
