@@ -24,6 +24,15 @@ Coordinates are **screen pixels**, like `input tap`. `pinch` and `pan` take opti
 Needs `adb` on your `PATH` and USB debugging on. Exits non-zero if the framework rejects the
 injection, so it's safe to chain with `&&` in scripts.
 
+## Demo
+
+<img src="assets/demo.gif" width="300" alt="Two-finger pinch and pan injected over adb, zooming and dragging a 3D model on an Android emulator">
+
+Every frame above is driven by `./mt` — no touchscreen, no root, no `am instrument`. Built while
+testing [Strux — IFC & BIM Viewer](https://play.google.com/store/apps/details?id=com.nowjordanhappy.strux),
+where pinch-to-zoom and two-finger pan are the whole interaction model and there was no way to
+exercise them from `adb`.
+
 ## Why this works without root
 
 `adb shell input` is itself a Java program run via `app_process` as the shell user, calling
