@@ -18,8 +18,26 @@ non-rootable emulators and physical devices alike.
 ./mt                                  # no args: print this usage
 ```
 
-Coordinates are **screen pixels**, like `input tap`. `pinch` and `pan` take optional trailing
-`[steps] [ms]` controlling smoothness and duration (defaults `12 300`); `tap` takes neither.
+### What the numbers mean
+
+```
+pinch <cx> <cy> <startGap> <endGap> [steps] [ms]
+pan   <cx> <cy> <dx> <dy>           [steps] [ms]
+tap   <x> <y>
+```
+
+| | |
+|---|---|
+| `cx` `cy` | Where the gesture is centred, in **screen pixels** — same coordinate space as `input tap`. `adb shell wm size` prints the screen; the middle of a 1080×2400 phone is `540 1200`. |
+| `startGap` `endGap` | How far apart the two fingers are, in pixels, at the start and at the end. **End bigger than start = pinch out = zoom in**; the other way round zooms out. |
+| `dx` `dy` | How far both fingers travel, in pixels. `y` grows **downward**, so a negative `dy` drags up — `0 -600` is a 600px upward drag. |
+| `steps` | How many MOVE events the gesture is split into (default `12`). More steps = smoother, which some apps need to track the gesture at all. |
+| `ms` | Total duration of the gesture (default `300`). |
+
+For `pinch` the two fingers are placed **vertically**, `gap/2` above and below `cy`. So
+`pinch 540 1170 300 1300` ends with fingers at y=520 and y=1820 — keep `cy ± endGap/2` on screen, or
+the gesture runs off the edge and the app sees something odd. For `pan` they sit 240px apart
+horizontally and move together.
 
 Needs `adb` on your `PATH` and USB debugging on. Exits non-zero if the framework rejects the
 injection, so it's safe to chain with `&&` in scripts.
