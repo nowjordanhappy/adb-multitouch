@@ -13,11 +13,16 @@ non-rootable emulators and physical devices alike.
 ./mt pinch 540 1170 1300 300          # pinch IN  (zoom out)
 ./mt pan   540 1170 0 -600            # two-finger drag up by 600px
 ./mt tap   540 1170
+./mt pinch 540 1170 300 1300 30 800   # slower, smoother: 30 steps over 800ms
 ./mt -s emulator-5556 pinch 540 1170 300 1300   # target a specific device
+./mt                                  # no args: print this usage
 ```
 
 Coordinates are **screen pixels**, like `input tap`. `pinch` and `pan` take optional trailing
 `[steps] [ms]` controlling smoothness and duration (defaults `12 300`); `tap` takes neither.
+
+Needs `adb` on your `PATH` and USB debugging on. Exits non-zero if the framework rejects the
+injection, so it's safe to chain with `&&` in scripts.
 
 ## Why this works without root
 
