@@ -85,30 +85,28 @@ public final class MultiTouch {
 
     /** Vertical pinch: finger 0 at (cx, cy-gap/2), finger 1 at (cx, cy+gap/2); gap goes startGap→endGap. */
     private static void pinch(float cx, float cy, float g0, float g1, int steps, int dur) throws Exception {
-        long down = SystemClock.uptimeMillis();
-        send(one(down, down, MotionEvent.ACTION_DOWN, cx, cy - g0 / 2));
-        send(two(down, down, PTR1_DOWN, cx, cy - g0 / 2, cx, cy + g0 / 2));
-        for (int s = 1; s <= steps; s++) {
-            float g = g0 + (g1 - g0) * s / steps;
-            send(two(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, cx, cy - g / 2, cx, cy + g / 2));
-            nap(Math.max(1, dur / steps));
-        }
-        send(two(down, SystemClock.uptimeMillis(), PTR1_UP, cx, cy - g1 / 2, cx, cy + g1 / 2));
-        send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, cx, cy - g1 / 2));
+        playTwoFinger(Gestures.pinch(cx, cy, g0, g1, steps), dur);
     }
 
-    /** Two-finger pan: two fingers 240px apart, both translated by (dx, dy). */
+    /** Two-finger pan: two fingers a fixed distance apart, both translated by (dx, dy). */
     private static void pan(float cx, float cy, float dx, float dy, int steps, int dur) throws Exception {
+        playTwoFinger(Gestures.pan(cx, cy, dx, dy, steps), dur);
+    }
+
+    /** Send a frame list ({x0,y0,x1,y1} rows) as DOWN → MOVEs → UP over the given duration. */
+    private static void playTwoFinger(float[][] frames, int dur) throws Exception {
         long down = SystemClock.uptimeMillis();
-        float ax = cx - 120, bx = cx + 120, ay = cy, by = cy;
-        send(one(down, down, MotionEvent.ACTION_DOWN, ax, ay));
-        send(two(down, down, PTR1_DOWN, ax, ay, bx, by));
+        float[] a = frames[0];
+        send(one(down, down, MotionEvent.ACTION_DOWN, a[0], a[1]));
+        send(two(down, down, PTR1_DOWN, a[0], a[1], a[2], a[3]));
+        int steps = frames.length - 1;
         for (int s = 1; s <= steps; s++) {
-            float fx = dx * s / steps, fy = dy * s / steps;
-            send(two(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, ax + fx, ay + fy, bx + fx, by + fy));
+            float[] fr = frames[s];
+            send(two(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, fr[0], fr[1], fr[2], fr[3]));
             nap(Math.max(1, dur / steps));
         }
-        send(two(down, SystemClock.uptimeMillis(), PTR1_UP, ax + dx, ay + dy, bx + dx, by + dy));
-        send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, ax + dx, ay + dy));
+        float[] z = frames[steps];
+        send(two(down, SystemClock.uptimeMillis(), PTR1_UP, z[0], z[1], z[2], z[3]));
+        send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, z[0], z[1]));
     }
 }

@@ -42,12 +42,25 @@ Prebuilt `mt.jar` is committed. To rebuild:
 ANDROID_HOME=~/Library/Android/sdk ./build.sh   # javac --release 8 + d8
 ```
 
+## Tests
+
+```bash
+./test.sh   # pure JVM, no device, no android.jar
+```
+
+Injection needs a real device (verify it by eye — a pinch zooms, a pan drags). What *is*
+unit-testable without one is the **gesture geometry** — where the two fingers are placed each frame.
+That lives in `Gestures.java` (no android deps), the shipped tool consumes it, and `GesturesTest`
+asserts the interpolation endpoints, symmetry and finger spacing.
+
 ## How it's structured
 
-- `MultiTouch.java` — the tool (`main` parses `pinch|pan|tap`, builds `MotionEvent`s, injects via
-  reflection so it needs no hidden-API stubs at compile time).
+- `Gestures.java` — pure two-pointer frame maths (testable off-device).
+- `MultiTouch.java` — the tool: parses `pinch|pan|tap`, turns frames into `MotionEvent`s, injects via
+  reflection so it needs no hidden-API stubs at compile time.
+- `GesturesTest.java` — runnable assert-based self-check (no framework).
 - `mt` — bash wrapper (push + `app_process` invocation).
-- `build.sh` — `javac` + `d8`.
+- `build.sh` / `test.sh` — `javac` + `d8` / run the checks.
 - `mt.jar` — the prebuilt dex.
 
 ## License

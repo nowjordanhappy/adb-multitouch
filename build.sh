@@ -13,7 +13,7 @@ echo "android.jar=$PLATFORM/android.jar"
 echo "d8=$BUILD_TOOLS/d8"
 
 rm -rf "$HERE/classes"
-javac --release 8 -cp "$PLATFORM/android.jar" -d "$HERE/classes" "$HERE/MultiTouch.java"
+javac --release 8 -cp "$PLATFORM/android.jar" -d "$HERE/classes" "$HERE/MultiTouch.java" "$HERE/Gestures.java"
 "$BUILD_TOOLS/d8" --min-api 26 --output "$HERE/mt.jar" "$HERE"/classes/com/strux/mt/*.class
 rm -rf "$HERE/classes"
 echo "built $HERE/mt.jar"
