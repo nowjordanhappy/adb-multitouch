@@ -14,7 +14,10 @@ CLASS=com.strux.mt.MultiTouch
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 ADB=(adb)
-if [[ "${1:-}" == "-s" ]]; then ADB=(adb -s "$2"); shift 2; fi
+if [[ "${1:-}" == "-s" ]]; then
+  [[ -n "${2:-}" ]] || { echo "-s needs a device serial" >&2; exit 1; }
+  ADB=(adb -s "$2"); shift 2
+fi
 
 cmd="${1:-}"; shift || true
 if [[ "$cmd" == "install" ]]; then
@@ -22,7 +25,8 @@ if [[ "$cmd" == "install" ]]; then
   echo "pushed $REMOTE"
   exit 0
 fi
-[[ -n "$cmd" ]] || { grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+# usage = the comment header, i.e. lines 2..first non-comment
+[[ -n "$cmd" ]] || { awk 'NR>1 && !/^#/{exit} NR>1{sub(/^# ?/,""); print}' "$0"; exit 1; }
 
 # auto-push if missing
 "${ADB[@]}" shell "[ -f $REMOTE ]" || "${ADB[@]}" push "$HERE/mt.jar" "$REMOTE" >/dev/null

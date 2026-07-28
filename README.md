@@ -16,8 +16,8 @@ non-rootable emulators and physical devices alike.
 ./mt -s emulator-5556 pinch 540 1170 300 1300   # target a specific device
 ```
 
-Coordinates are **screen pixels**, like `input tap`. Optional trailing `[steps] [ms]` control smoothness
-and duration (defaults `12 350`).
+Coordinates are **screen pixels**, like `input tap`. `pinch` and `pan` take optional trailing
+`[steps] [ms]` controlling smoothness and duration (defaults `12 300`); `tap` takes neither.
 
 ## Why this works without root
 
@@ -32,15 +32,18 @@ those for shell), no root, no `am instrument`.
 - **MIUI / some OEMs:** enable *Developer options → USB debugging (Security settings)* (it lets adb
   simulate input). It silently resets itself; if injection does nothing, re-check it.
 - Injects into whatever window is focused (the coordinates are absolute screen pixels).
-- Verified: Android 11 emulator (google_apis), **shell + SELinux Enforcing + no root**.
+- Verified: Android 11 emulator (google_apis), **shell + SELinux Enforcing + no root**. Android 14+
+  moved injection onto `InputManagerGlobal`; the tool tries that first and falls back — untested there.
 
 ## Build
 
 Prebuilt `mt.jar` is committed. To rebuild:
 
 ```bash
-ANDROID_HOME=~/Library/Android/sdk ./build.sh   # javac --release 8 + d8
+ANDROID_HOME=~/Library/Android/sdk ./build.sh   # javac --release 11 + d8 --min-api 26
 ```
+
+The committed jar was built with android-36 / build-tools 36.0.0 (`build.sh` picks the newest it finds).
 
 ## Tests
 

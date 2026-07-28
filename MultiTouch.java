@@ -24,7 +24,10 @@ public final class MultiTouch {
     private static final int MODE_ASYNC = 0; // INJECT_INPUT_EVENT_MODE_ASYNC
 
     public static void main(String[] a) throws Exception {
-        Class<?> im = Class.forName("android.hardware.input.InputManager");
+        // Android 14 moved injection off InputManager onto InputManagerGlobal (same method, same path).
+        Class<?> im;
+        try { im = Class.forName("android.hardware.input.InputManagerGlobal"); }
+        catch (ClassNotFoundException pre14) { im = Class.forName("android.hardware.input.InputManager"); }
         inputManager = im.getMethod("getInstance").invoke(null);
         inject = im.getMethod("injectInputEvent", InputEvent.class, int.class);
 
@@ -39,6 +42,7 @@ public final class MultiTouch {
 
     private static void usage() {
         System.err.println("usage: tap x y | pinch cx cy startGap endGap [steps] [ms] | pan cx cy dx dy [steps] [ms]");
+        System.exit(2);
     }
 
     private static float f(String[] a, int i) { return Float.parseFloat(a[i]); }
@@ -47,8 +51,12 @@ public final class MultiTouch {
 
     private static void send(MotionEvent e) throws Exception {
         e.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-        inject.invoke(inputManager, e, MODE_ASYNC);
+        Object ok = inject.invoke(inputManager, e, MODE_ASYNC);
         e.recycle();
+        if (Boolean.FALSE.equals(ok)) {
+            System.err.println("injection rejected — MIUI/OEM: enable Developer options -> USB debugging (Security settings)");
+            System.exit(1);
+        }
     }
 
     private static PointerProperties prop(int id) {
