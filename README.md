@@ -32,8 +32,9 @@ those for shell), no root, no `am instrument`.
 - **MIUI / some OEMs:** enable *Developer options → USB debugging (Security settings)* (it lets adb
   simulate input). It silently resets itself; if injection does nothing, re-check it.
 - Injects into whatever window is focused (the coordinates are absolute screen pixels).
-- Verified: Android 11 emulator (google_apis), **shell + SELinux Enforcing + no root**. Android 14+
-  moved injection onto `InputManagerGlobal`; the tool tries that first and falls back — untested there.
+- Verified on Android 11 and Android 16 (API 36) emulators, **shell + SELinux Enforcing + no root**.
+  Android 14 moved injection onto `InputManagerGlobal`; the tool tries that first, falls back to
+  `InputManager` on older releases.
 
 ## Build
 
