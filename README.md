@@ -96,9 +96,11 @@ those for shell), no root, no `am instrument`.
   first (Maps' zoom easing, a fling, a camera move it started itself) and it may swallow it, or read
   a pinch as a drag. Injection still succeeds and exits 0 — the app just ignored it. ~2s apart is
   reliable; 1s was not.
-- Verified on Android 11 and Android 16 (API 36) emulators, **shell + SELinux Enforcing + no root**.
-  Android 14 moved injection onto `InputManagerGlobal`; the tool tries that first, falls back to
-  `InputManager` on older releases.
+- Verified on a **physical Xiaomi Redmi Note 11 (Android 13, MIUI V140)** and on Android 11 and
+  Android 16 (API 36) emulators — **shell + SELinux Enforcing + no root** in every case.
+- Android 14 moved injection onto `InputManagerGlobal`; the tool tries that first and falls back to
+  `InputManager` on older releases. The fallback is what the Xiaomi above exercises — the
+  `InputManagerGlobal` branch has so far only been run on the API 36 emulator.
 
 ## Build
 
