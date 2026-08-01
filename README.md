@@ -68,8 +68,8 @@ fling; `input draganddrop` exists but did nothing on Launcher3. Use it for home 
 drag-and-drop, drag-to-delete, and list reordering:
 
 ```bash
-./mt drag 416 993 540 220                  # Launcher3: widget onto "Remove" (defaults are enough)
-./mt drag 540 1866 540 1000 2000 30 2500   # MIUI: needs a ~2s hold and a slower drag
+./mt drag 416 993 540 220                 # Launcher3: widget onto "Remove" (defaults are enough)
+./mt drag 540 1866 540 150 2000 30 3000   # MIUI: same drag to the top, but needs a ~2s hold
 ```
 
 After the last MOVE the finger pauses briefly before the UP, because drop targets only highlight on
@@ -77,9 +77,11 @@ hover and releasing instantly lands on nothing.
 
 **The defaults are tuned for Launcher3; OEM launchers are slower.** On MIUI 14 the default 600ms
 hold raises the edit-mode popup, but the widget doesn't follow the finger — the MOVEs arrive while
-the lift animation is still running and get dropped. `2000 30 2500` (2s hold, 30 steps over 2.5s)
-moves it reliably. If a drag does nothing, raise the hold before assuming injection failed: `exit=0`
-means the events were delivered, not that the launcher acted on them.
+the lift animation is still running and get dropped. `2000 30 3000` (2s hold, 30 steps over 3s)
+both moves and removes reliably. If a drag does nothing, **raise the hold** before concluding the
+gesture is unsupported: `exit=0` means the events were delivered, not that the launcher acted on
+them. Nearly every "MIUI doesn't support this" dead end here turned out to be a hold that was too
+short.
 
 For `pinch` the two fingers are placed **vertically**, `gap/2` above and below `cy`. So
 `pinch 540 1170 300 1300` ends with fingers at y=520 and y=1820 — keep `cy ± endGap/2` on screen, or
@@ -121,14 +123,14 @@ writes (SELinux blocks those for shell), no root, no `am instrument`.
   first (Maps' zoom easing, a fling, a camera move it started itself) and it may swallow it, or read
   a pinch as a drag. Injection still succeeds and exits 0 — the app just ignored it. ~2s apart is
   reliable; 1s was not.
-- **`drag` depends on where the drop target is**, which is launcher-specific — Launcher3 puts
-  "Remove" at the top of the screen; MIUI floats it right next to the widget you grabbed, and
-  removal there is a *tap* on that button rather than a drop onto it. Dump the screen and aim,
-  don't guess.
+- **`drag` depends on where the drop target is.** Launcher3 and MIUI 14 both put it at the **top of
+  the screen**, so dragging there removes. (MIUI *also* floats a "Remove" menu button beside the
+  widget on long-press — that's an edit-mode affordance, not the drop target; ignore it and keep
+  dragging to the top.) Other launchers may differ: dump the screen mid-drag and aim.
 - Verified on a **physical Xiaomi Redmi Note 11 (Android 13, MIUI V140)** and on Android 11 and
   Android 16 (API 36) emulators — **shell + SELinux Enforcing + no root** in every case. `drag`
-  specifically: removed *and* repositioned a home screen widget on Launcher3 (API 36 emulator), and
-  repositioned one on MIUI with the longer timings above.
+  specifically: removed *and* repositioned a home screen widget on both Launcher3 (API 36 emulator)
+  and MIUI 14 — the latter with the longer timings above.
 - Android 14 moved injection onto `InputManagerGlobal`; the tool tries that first and falls back to
   `InputManager` on older releases. The fallback is what the Xiaomi above exercises — the
   `InputManagerGlobal` branch has so far only been run on the API 36 emulator.
