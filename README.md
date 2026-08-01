@@ -90,6 +90,33 @@ horizontally and move together.
 
 Exits non-zero if the framework rejects the injection, so it's safe to chain with `&&` in scripts.
 
+## Driving it from a script (or an agent)
+
+Every gesture is one line, takes absolute screen pixels, and exits non-zero if the framework
+rejects the injection — so it scripts like any other shell command. The coordinates come from the
+device itself, which closes the loop:
+
+```bash
+# 1. dump the screen, find the thing you want to touch
+adb shell uiautomator dump /sdcard/ui.xml
+adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -i AppWidgetHostView
+#   ... content-desc="Weather" bounds="[314,542][766,815]"
+
+# 2. aim at its centre and gesture
+./mt drag 540 678 540 150 2000 30 3000     # drag it to the top of the screen
+
+# 3. verify from the device, not from the screenshot
+adb shell dumpsys appwidget | grep -c com.example.app     # one fewer than before
+```
+
+**Dump → aim → gesture → verify by dumping again.** The last step is the one people skip: `exit=0`
+means the events were *delivered*, not that the app acted on them, so the result has to be read
+back — a dump, a `dumpsys` count, a logcat line. Vary the timing before concluding a gesture is
+unsupported (see the hold caveat above).
+
+That loop is also what makes this usable by a coding agent: it can run each step and check the
+output, but it has no way to touch a screen.
+
 ## Demo
 
 Google Maps, pinched from the command line — nothing about the app is modified or instrumented:
