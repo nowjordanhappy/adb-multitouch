@@ -16,7 +16,7 @@ import java.lang.reflect.Method;
  *   adb shell CLASSPATH=/data/local/tmp/mt.jar app_process /system/bin com.nowjordanhappy.mt.MultiTouch \
  *       pinch  <cx> <cy> <startGap> <endGap> [steps] [ms]
  *       pan    <cx> <cy> <dx> <dy>           [steps] [ms]
- *       drag   <x0> <y0> <x1> <y1>           [holdMs] [steps] [ms]
+ *       drag   <x0> <y0> <x1> <y1>           [holdMs] [steps] [ms]   (note: holdMs comes FIRST)
  *       tap    <x> <y>
  */
 public final class MultiTouch {
@@ -31,15 +31,29 @@ public final class MultiTouch {
         catch (ClassNotFoundException pre14) { im = Class.forName("android.hardware.input.InputManager"); }
         inputManager = im.getMethod("getInstance").invoke(null);
         inject = im.getMethod("injectInputEvent", InputEvent.class, int.class);
+        Runtime.getRuntime().addShutdownHook(new Thread(MultiTouch::cancelLivePointer)); // Ctrl-C mid-hold
 
         if (a.length == 0) { usage(); return; }
-        switch (a[0]) {
-            case "tap":   tap(f(a,1), f(a,2)); break;
-            case "pinch": pinch(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,12), i(a,6,300)); break;
-            case "pan":   pan(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,12), i(a,6,300)); break;
-            case "drag":  drag(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,600), i(a,6,12), i(a,7,600)); break;
-            default: usage();
+        try {
+            switch (a[0]) {
+                case "tap":   tap(f(a,1), f(a,2)); break;
+                case "pinch": pinch(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,12), i(a,6,300)); break;
+                case "pan":   pan(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,12), i(a,6,300)); break;
+                case "drag":  drag(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,1000), i(a,6,20), i(a,7,800)); break;
+                default: usage();
+            }
+        } catch (ArrayIndexOutOfBoundsException | NumberFormatException bad) {
+            // callers are often scripts building these commands — usage beats a stack trace
+            usage();
+        } catch (Rejected r) {
+            System.err.println(r.getMessage());
+            System.exit(1);
         }
+    }
+
+    /** Injection refused outright — distinct from "delivered but the app ignored it". */
+    private static final class Rejected extends RuntimeException {
+        Rejected(String m) { super(m); }
     }
 
     private static void usage() {
@@ -57,8 +71,28 @@ public final class MultiTouch {
         Object ok = inject.invoke(inputManager, e, MODE_ASYNC);
         e.recycle();
         if (Boolean.FALSE.equals(ok)) {
-            System.err.println("injection rejected — MIUI/OEM: enable Developer options -> USB debugging (Security settings)");
-            System.exit(1);
+            // throw, don't exit: a drag that dies here has a finger down that still needs cancelling
+            throw new Rejected("injection rejected — MIUI/OEM: enable Developer options -> USB debugging (Security settings)");
+        }
+    }
+
+    // A drag holds a pointer down for seconds. If anything kills the process in between — a rejected
+    // event, Ctrl-C — the window is left mid-gesture with no UP coming, and the launcher stays in
+    // drag mode. Track the live pointer so it can always be cancelled.
+    private static long liveDown;
+    private static float[] liveAt;
+
+    private static synchronized void cancelLivePointer() {
+        if (liveAt == null) return;
+        float[] at = liveAt;
+        liveAt = null;
+        try {
+            MotionEvent e = one(liveDown, SystemClock.uptimeMillis(), MotionEvent.ACTION_CANCEL, at[0], at[1]);
+            e.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+            inject.invoke(inputManager, e, MODE_ASYNC);
+            e.recycle();
+        } catch (Exception ignored) {
+            // best effort: we're already on a failure path
         }
     }
 
@@ -96,12 +130,12 @@ public final class MultiTouch {
 
     /** Vertical pinch: finger 0 at (cx, cy-gap/2), finger 1 at (cx, cy+gap/2); gap goes startGap→endGap. */
     private static void pinch(float cx, float cy, float g0, float g1, int steps, int dur) throws Exception {
-        playTwoFinger(Gestures.pinch(cx, cy, g0, g1, steps), dur);
+        playTwoFinger(Gestures.pinch(cx, cy, g0, g1, Math.max(1, steps)), dur);
     }
 
     /** Two-finger pan: two fingers a fixed distance apart, both translated by (dx, dy). */
     private static void pan(float cx, float cy, float dx, float dy, int steps, int dur) throws Exception {
-        playTwoFinger(Gestures.pan(cx, cy, dx, dy, steps), dur);
+        playTwoFinger(Gestures.pan(cx, cy, dx, dy, Math.max(1, steps)), dur);
     }
 
     /**
@@ -110,20 +144,39 @@ public final class MultiTouch {
      * into drag mode and the gesture reads as a fling.
      */
     private static void drag(float x0, float y0, float x1, float y1, int hold, int steps, int dur) throws Exception {
+        steps = Math.max(1, steps); // steps=0 would interpolate to NaN and inject a touch at (NaN, NaN)
+        int settle = Math.max(SETTLE_MIN_MS, hold / 4);
+        // echo what was actually parsed: the arg order is [holdMs] [steps] [ms], unlike pinch/pan's
+        // [steps] [ms], and getting it wrong fails exactly like an unsupported gesture
+        System.err.println("drag (" + x0 + "," + y0 + ")->(" + x1 + "," + y1 + ")"
+                + " hold=" + hold + " steps=" + steps + " ms=" + dur + " settle=" + settle);
+        if (hold < 300) {
+            System.err.println("warning: holdMs=" + hold + " is under the long-press timeout"
+                    + " (a user setting: 400/1000/1500ms) — argument order is [holdMs] [steps] [ms]");
+        }
+
         float[][] frames = Gestures.drag(x0, y0, x1, y1, steps);
         long down = SystemClock.uptimeMillis();
-        send(one(down, down, MotionEvent.ACTION_DOWN, frames[0][0], frames[0][1]));
-        nap(hold); // the point of the whole command — must outlast the platform long-press timeout
-        for (int s = 1; s <= steps; s++) {
-            send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, frames[s][0], frames[s][1]));
-            nap(Math.max(1, dur / steps));
+        try {
+            send(one(down, down, MotionEvent.ACTION_DOWN, frames[0][0], frames[0][1]));
+            synchronized (MultiTouch.class) { liveDown = down; liveAt = frames[0].clone(); }
+            nap(hold); // the point of the whole command — must outlast the long-press timeout
+            for (int s = 1; s <= steps; s++) {
+                send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, frames[s][0], frames[s][1]));
+                synchronized (MultiTouch.class) { liveAt = frames[s].clone(); }
+                nap(Math.max(1, dur / steps));
+            }
+            float[] z = frames[steps];
+            nap(settle); // drop targets highlight on hover; releasing instantly lands on nothing
+            send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, z[0], z[1]));
+            synchronized (MultiTouch.class) { liveAt = null; }
+        } finally {
+            cancelLivePointer(); // no-op once the UP has gone out
         }
-        float[] z = frames[steps];
-        nap(SETTLE_MS); // drop targets highlight on hover; releasing instantly lands on nothing
-        send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, z[0], z[1]));
     }
 
-    private static final int SETTLE_MS = 250;
+    /** Launcher3's hover/edge-scroll timers run on ~500ms; a shorter settle drops onto nothing. */
+    private static final int SETTLE_MIN_MS = 500;
 
     /** Send a frame list ({x0,y0,x1,y1} rows) as DOWN → MOVEs → UP over the given duration. */
     private static void playTwoFinger(float[][] frames, int dur) throws Exception {

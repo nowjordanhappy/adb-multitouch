@@ -29,6 +29,9 @@ fi
 # usage = the comment header, i.e. lines 2..first non-comment
 [[ -n "$cmd" ]] || { awk 'NR>1 && !/^#/{exit} NR>1{sub(/^# ?/,""); print}' "$0"; exit 1; }
 
-# auto-push if missing
-"${ADB[@]}" shell "[ -f $REMOTE ]" || "${ADB[@]}" push "$HERE/mt.jar" "$REMOTE" >/dev/null
+# auto-push if missing OR stale — a device that ran an older build would otherwise get
+# "unknown command" for anything added since, which reads like the feature doesn't exist
+local_size=$(wc -c < "$HERE/mt.jar" | tr -d ' ')
+remote_size=$("${ADB[@]}" shell "stat -c %s $REMOTE 2>/dev/null" | tr -d '\r')
+[[ "$local_size" == "$remote_size" ]] || "${ADB[@]}" push "$HERE/mt.jar" "$REMOTE" >/dev/null
 exec "${ADB[@]}" shell "CLASSPATH=$REMOTE app_process /system/bin $CLASS $cmd $*"

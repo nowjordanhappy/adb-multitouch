@@ -58,9 +58,9 @@ tap   <x> <y>
 | `startGap` `endGap` | How far apart the two fingers are, in pixels, at the start and at the end. **End bigger than start = pinch out = zoom in**; the other way round zooms out. |
 | `dx` `dy` | How far both fingers travel, in pixels. `y` grows **downward**, so a negative `dy` drags up — `0 -600` is a 600px upward drag. |
 | `x0` `y0` → `x1` `y1` | For `drag`, where the one finger starts and ends — grab point to drop point. |
-| `holdMs` | For `drag`, how long the finger stays still after touching down (default `600`). This is the whole point of the command: launchers and lists enter drag mode on a **long-press**, so the hold has to outlast the platform's long-press timeout (~500ms). |
-| `steps` | How many MOVE events the gesture is split into (default `12`). More steps = smoother, which some apps need to track the gesture at all. |
-| `ms` | Total duration of the gesture (default `300`). |
+| `holdMs` | For `drag`, how long the finger stays still after touching down (default `1000`). This is the whole point of the command: launchers and lists enter drag mode on a **long-press**, so the hold must outlast the long-press timeout — and that timeout is a **user setting**, not a constant: *Accessibility → Touch & hold delay* is 400 / 1000 / 1500ms. A device set to "Long" needs `holdMs` above 1500 on stock Android, no OEM involved. |
+| `steps` | How many MOVE events the gesture is split into (default `12`; `20` for `drag`). More steps = smoother, which some apps need to track the gesture at all. |
+| `ms` | How long the travel takes (default `300`; `800` for `drag`). A `drag` call blocks for `holdMs + ms + settle` in total — about 2.3s on defaults, 5.5s with the MIUI numbers below. |
 
 `drag` is one finger, not two — it's here because `input` can't express it either. `input swipe`
 starts moving immediately, so the view never long-presses into drag mode and the gesture reads as a
@@ -70,31 +70,33 @@ drag-and-drop, drag-to-delete, and list reordering:
 ```bash
 ./mt drag 416 993 540 220                 # Launcher3: widget onto "Remove" (defaults are enough)
 ./mt drag 540 1866 540 150 2000 30 3000   # MIUI: same drag to the top, but needs a ~2s hold
+./mt drag 540 1200 540 1200 1500 1 1      # press and hold in place (start == end), e.g. to open a
+                                          # context menu — no separate long-press command needed
 ```
 
 After the last MOVE the finger pauses briefly before the UP, because drop targets only highlight on
 hover and releasing instantly lands on nothing.
 
-**The defaults are tuned for Launcher3; OEM launchers are slower.** On MIUI 14 the default 600ms
-hold raises the edit-mode popup, but the widget doesn't follow the finger — the MOVEs arrive while
-the lift animation is still running and get dropped. `2000 30 3000` (2s hold, 30 steps over 3s)
-both moves and removes reliably. If a drag does nothing, **raise the hold** before concluding the
-gesture is unsupported: `exit=0` means the events were delivered, not that the launcher acted on
-them. Nearly every "MIUI doesn't support this" dead end here turned out to be a hold that was too
-short.
+**If a drag does nothing, raise the hold before concluding the gesture is unsupported.** On MIUI 14
+even a 600ms hold raises the edit-mode popup while the widget never follows the finger — the MOVEs
+arrive during the lift animation and get dropped; `2000 30 3000` both moves and removes reliably.
+Every "MIUI doesn't support this" dead end here turned out to be a hold that was too short, and the
+failure is silent because injection still succeeds (see the exit-code note above).
 
 For `pinch` the two fingers are placed **vertically**, `gap/2` above and below `cy`. So
 `pinch 540 1170 300 1300` ends with fingers at y=520 and y=1820 — keep `cy ± endGap/2` on screen, or
 the gesture runs off the edge and the app sees something odd. For `pan` they sit 240px apart
 horizontally and move together.
 
-Exits non-zero if the framework rejects the injection, so it's safe to chain with `&&` in scripts.
+Exits non-zero if the injection is refused outright — *USB debugging (Security settings)* off, no
+device, a rejected call. A **zero exit is not evidence the app did anything**: events are injected
+asynchronously, so success only means they were enqueued. Read the result back from the device
+instead — see [Driving it from a script (or an agent)](#driving-it-from-a-script-or-an-agent).
 
 ## Driving it from a script (or an agent)
 
-Every gesture is one line, takes absolute screen pixels, and exits non-zero if the framework
-rejects the injection — so it scripts like any other shell command. The coordinates come from the
-device itself, which closes the loop:
+Every gesture is one line and takes absolute screen pixels, so it scripts like any other shell
+command. The coordinates come from the device itself, which closes the loop:
 
 ```bash
 # 1. dump the screen, find the thing you want to touch
@@ -106,12 +108,19 @@ adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -i AppWidgetHostView
 ./mt drag 540 678 540 150 2000 30 3000     # drag it to the top of the screen
 
 # 3. verify from the device, not from the screenshot
-adb shell dumpsys appwidget | grep -c com.example.app     # one fewer than before
+adb shell uiautomator dump /sdcard/after.xml
+adb shell cat /sdcard/after.xml | tr '>' '\n' | grep -c 'content-desc="Weather"'   # 0 — it's gone
 ```
+
+The `tr '>' '\n'` isn't decoration: `uiautomator dump` writes the whole tree as **one line**, so a
+bare `grep -c` answers 0 or 1 no matter how many nodes match. And don't reach for
+`dumpsys appwidget | grep -c <package>` — that counts provider *registrations*, which don't change
+when a widget is added or removed. (Both of these produced a confidently wrong "it didn't work"
+here before the dump was re-read properly.)
 
 **Dump → aim → gesture → verify by dumping again.** The last step is the one people skip: `exit=0`
 means the events were *delivered*, not that the app acted on them, so the result has to be read
-back — a dump, a `dumpsys` count, a logcat line. Vary the timing before concluding a gesture is
+back — a re-dump, or a log line from the app itself. Vary the timing before concluding a gesture is
 unsupported (see the hold caveat above).
 
 That loop is also what makes this usable by a coding agent: it can run each step and check the
@@ -143,6 +152,27 @@ writes (SELinux blocks those for shell), no root, no `am instrument`.
 
 ## Caveats
 
+- **`drag` can't move an item to another home screen page** — because it travels in one straight
+  line and releases at the end. Holding at the edge *does* flip the page (Launcher3 snaps after
+  ~500ms, even with a completely stationary pointer), but the drop target at the edge is the page
+  beyond, so releasing there sends the item home. You have to carry on **inward onto the new page**
+  before letting go, and that's a reversal `drag` has no way to express. Stock `input` can, since a
+  gesture stream survives across processes:
+
+  ```bash
+  adb shell 'input motionevent DOWN 416 1623; sleep 1.5;
+    for x in 550 700 850 1000 1060; do input motionevent MOVE $x 1623; sleep 0.15; done;
+    sleep 3;                                                        # page flips while stationary
+    for x in 950 850 750 650 540 450; do input motionevent MOVE $x 1623; sleep 0.2; done;
+    sleep 2; input motionevent UP 450 1623'                         # release on the NEW page
+  ```
+
+  Verified both directions on Launcher3 (API 36). When checking the result, note the item usually
+  lands in the **same grid cell on the next page**, so its `bounds` are unchanged — compare the
+  pages' contents, not the coordinates, or you'll read a success as a failure.
+- **An interrupted `drag` leaves the finger down.** The tool cancels the pointer on failure and on
+  Ctrl-C, but if it's killed outright (`SIGKILL`) the launcher stays in drag mode — `./mt tap 1 1`
+  clears it.
 - **MIUI / some OEMs:** enable *Developer options → USB debugging (Security settings)* (it lets adb
   simulate input). It silently resets itself; if injection does nothing, re-check it.
 - Injects into whatever window is focused (the coordinates are absolute screen pixels).
