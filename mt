@@ -4,6 +4,7 @@
 #   ./mt install                       push mt.jar to the device (once)
 #   ./mt pinch  <cx> <cy> <g0> <g1> [steps] [ms]   two-finger pinch (g0->g1 = start/end finger gap, px)
 #   ./mt pan    <cx> <cy> <dx> <dy>   [steps] [ms]   two-finger drag by (dx,dy)
+#   ./mt drag   <x0> <y0> <x1> <y1>   [holdMs] [steps] [ms]   one-finger press-hold-drag-release
 #   ./mt tap    <x> <y>
 #
 # -s <serial> as the FIRST args to target a specific device: ./mt -s emulator-5556 pinch ...
