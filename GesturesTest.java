@@ -26,6 +26,22 @@ public class GesturesTest {
         eq(0f, q[16][0] - q[0][0], "pan honours dx=0");
         eq(350f, q[8][1] - q[0][1], "pan translates linearly at the midpoint");
 
+        // --- drag (one pointer, {x,y} rows) ---
+        float[][] d = Gestures.drag(169, 678, 540, 220, 12);
+        eq(13, d.length, "drag frame count = steps+1");
+        eq(2, d[0].length, "drag frames carry one pointer");
+        eq(169f, d[0][0], "drag starts at x0");
+        eq(678f, d[0][1], "drag starts at y0");
+        eq(540f, d[12][0], "drag ends at x1");
+        eq(220f, d[12][1], "drag ends at y1");
+        eq(354.5f, d[6][0], "drag interpolates x linearly at the midpoint");
+        eq(449f, d[6][1], "drag interpolates y linearly at the midpoint");
+
+        // a drag that goes nowhere is still a valid press-and-hold, not a divide-by-zero
+        float[][] still = Gestures.drag(100, 100, 100, 100, 4);
+        eq(5, still.length, "zero-distance drag still yields frames");
+        eq(100f, still[4][0], "zero-distance drag stays put");
+
         // --- degenerate: 1 step still yields a start and an end ---
         float[][] r = Gestures.pinch(0, 0, 100, 200, 1);
         eq(2, r.length, "steps=1 gives start+end");

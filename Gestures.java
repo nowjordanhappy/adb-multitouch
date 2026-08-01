@@ -31,5 +31,18 @@ public final class Gestures {
         return f;
     }
 
+    /**
+     * Single-finger straight line from (x0,y0) to (x1,y1). Frames are {x, y} — one pointer, so half
+     * the width of the two-finger rows above. What makes this a <em>drag</em> rather than a swipe is
+     * the caller holding after the DOWN; the geometry is the same either way.
+     */
+    public static float[][] drag(float x0, float y0, float x1, float y1, int steps) {
+        float[][] f = new float[steps + 1][];
+        for (int s = 0; s <= steps; s++) {
+            f[s] = new float[]{x0 + (x1 - x0) * s / steps, y0 + (y1 - y0) * s / steps};
+        }
+        return f;
+    }
+
     public static final float PAN_SPACING = 240f;
 }

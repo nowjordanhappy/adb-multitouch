@@ -16,6 +16,7 @@ import java.lang.reflect.Method;
  *   adb shell CLASSPATH=/data/local/tmp/mt.jar app_process /system/bin com.nowjordanhappy.mt.MultiTouch \
  *       pinch  <cx> <cy> <startGap> <endGap> [steps] [ms]
  *       pan    <cx> <cy> <dx> <dy>           [steps] [ms]
+ *       drag   <x0> <y0> <x1> <y1>           [holdMs] [steps] [ms]
  *       tap    <x> <y>
  */
 public final class MultiTouch {
@@ -36,12 +37,14 @@ public final class MultiTouch {
             case "tap":   tap(f(a,1), f(a,2)); break;
             case "pinch": pinch(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,12), i(a,6,300)); break;
             case "pan":   pan(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,12), i(a,6,300)); break;
+            case "drag":  drag(f(a,1), f(a,2), f(a,3), f(a,4), i(a,5,600), i(a,6,12), i(a,7,600)); break;
             default: usage();
         }
     }
 
     private static void usage() {
-        System.err.println("usage: tap x y | pinch cx cy startGap endGap [steps] [ms] | pan cx cy dx dy [steps] [ms]");
+        System.err.println("usage: tap x y | pinch cx cy startGap endGap [steps] [ms] | pan cx cy dx dy [steps] [ms]"
+                + " | drag x0 y0 x1 y1 [holdMs] [steps] [ms]");
         System.exit(2);
     }
 
@@ -100,6 +103,27 @@ public final class MultiTouch {
     private static void pan(float cx, float cy, float dx, float dy, int steps, int dur) throws Exception {
         playTwoFinger(Gestures.pan(cx, cy, dx, dy, steps), dur);
     }
+
+    /**
+     * One-finger press-hold-move-release — launcher drag-and-drop, drag-to-delete, reordering.
+     * `input swipe` can't express this: it starts moving immediately, so the view never long-presses
+     * into drag mode and the gesture reads as a fling.
+     */
+    private static void drag(float x0, float y0, float x1, float y1, int hold, int steps, int dur) throws Exception {
+        float[][] frames = Gestures.drag(x0, y0, x1, y1, steps);
+        long down = SystemClock.uptimeMillis();
+        send(one(down, down, MotionEvent.ACTION_DOWN, frames[0][0], frames[0][1]));
+        nap(hold); // the point of the whole command — must outlast the platform long-press timeout
+        for (int s = 1; s <= steps; s++) {
+            send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, frames[s][0], frames[s][1]));
+            nap(Math.max(1, dur / steps));
+        }
+        float[] z = frames[steps];
+        nap(SETTLE_MS); // drop targets highlight on hover; releasing instantly lands on nothing
+        send(one(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, z[0], z[1]));
+    }
+
+    private static final int SETTLE_MS = 250;
 
     /** Send a frame list ({x0,y0,x1,y1} rows) as DOWN → MOVEs → UP over the given duration. */
     private static void playTwoFinger(float[][] frames, int dur) throws Exception {
